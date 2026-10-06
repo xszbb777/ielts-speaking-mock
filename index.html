@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <meta name="description" content="Voice-interactive IELTS Speaking mock test with current-quarter question bank and end-of-test feedback.">
+  <title>IELTS Speaking Mock Test</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand" aria-label="IELTS Speaking Mock Test">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span>IELTS Speaking</span>
+      </div>
+      <div class="session-state" id="sessionState">
+        <span class="state-light" aria-hidden="true"></span>
+        <span>Ready</span>
+      </div>
+    </header>
+
+    <section class="stage" id="welcomeView">
+      <div class="welcome-copy">
+        <p class="eyebrow">FULL MOCK · VOICE INTERACTIVE</p>
+        <h1>Enter the speaking room.</h1>
+        <p class="intro">严格按 Part 1–3 进行。考试中不点评、不纠错；全部结束后再统一反馈与估分。</p>
+      </div>
+      <div class="briefing">
+        <div class="brief-row"><span>01</span><p><b>Part 1</b> · 2–3 topics / 8–12 short answers</p></div>
+        <div class="brief-row"><span>02</span><p><b>Part 2</b> · 1 min preparation / 1–2 min speech</p></div>
+        <div class="brief-row"><span>03</span><p><b>Part 3</b> · 4–6 questions with adaptive follow-ups</p></div>
+      </div>
+      <div class="setup-note" id="compatibilityNote">正在检查浏览器的语音功能…</div>
+      <button class="primary-button" id="startButton">Start full mock test</button>
+      <p class="privacy-note">本站不保存录音或转写；浏览器可能调用其自带的在线语音识别服务。</p>
+    </section>
+
+    <section class="stage exam-stage hidden" id="examView" aria-live="polite">
+      <div class="exam-head">
+        <div>
+          <p class="eyebrow" id="partLabel">PART 1 · INTERVIEW</p>
+          <h2 id="phaseTitle">Introduction and interview</h2>
+        </div>
+        <div class="timer" id="timer" aria-label="计时器">00:00</div>
+      </div>
+
+      <div class="progress-track" aria-hidden="true"><span id="progressFill"></span></div>
+
+      <div class="examiner-panel">
+        <div class="examiner-avatar" aria-hidden="true"><span></span><i></i></div>
+        <div class="question-wrap">
+          <p class="speaker-label">EXAMINER</p>
+          <p class="question" id="questionText"></p>
+          <ul class="cue-list hidden" id="cueList"></ul>
+        </div>
+      </div>
+
+      <div class="prep-panel hidden" id="prepPanel">
+        <label for="notes">Preparation notes</label>
+        <textarea id="notes" maxlength="500" placeholder="You may write short notes here…"></textarea>
+        <p>准备时间结束后，讲话计时会自动开始。</p>
+      </div>
+
+      <div class="answer-panel" id="answerPanel">
+        <div class="voice-status">
+          <div class="wave" id="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          <span id="voiceStatus">Press the microphone when you are ready.</span>
+        </div>
+        <div class="transcript-box" id="transcriptBox">
+          <p id="interimTranscript">Your answer will appear here…</p>
+        </div>
+        <textarea class="manual-answer hidden" id="manualAnswer" placeholder="Type your answer here if voice recognition is unavailable."></textarea>
+        <div class="answer-actions">
+          <button class="mic-button" id="micButton" aria-label="Start recording"><span aria-hidden="true"></span></button>
+          <button class="secondary-button" id="submitAnswer" disabled>Submit answer</button>
+        </div>
+      </div>
+
+      <div class="exam-controls">
+        <button class="text-button" id="repeatButton">Repeat question</button>
+        <span id="questionCounter">Question 1 of 10</span>
+      </div>
+    </section>
+
+    <section class="stage results-stage hidden" id="resultsView">
+      <div class="result-hero">
+        <div>
+          <p class="eyebrow">MOCK TEST COMPLETE</p>
+          <h1>Your speaking report</h1>
+          <p>以下反馈基于本次完整回答，在考试过程中没有插入即时建议。</p>
+        </div>
+        <div class="band-orbit"><span>Estimated</span><b id="overallBand">6.5</b><small>Overall band</small></div>
+      </div>
+
+      <div class="score-grid" id="scoreGrid"></div>
+
+      <div class="report-grid">
+        <article>
+          <h3>Fluency snapshot</h3>
+          <div class="metrics" id="metrics"></div>
+        </article>
+        <article>
+          <h3>“背稿感”提示</h3>
+          <div id="memorisedNotes"></div>
+        </article>
+        <article class="wide">
+          <h3>可以自然扩展的地方</h3>
+          <div id="expansionNotes"></div>
+        </article>
+      </div>
+
+      <p class="result-caveat">本报告是练习用途的浏览器端估算；Pronunciation 主要依据语音识别稳定度与流畅度代理指标，不能替代官方考官评分。</p>
+      <div class="result-actions">
+        <button class="primary-button" id="restartButton">Start another mock</button>
+        <button class="secondary-button" id="downloadButton">Download transcript</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="questions.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+
