@@ -44,6 +44,99 @@
     return [...items].sort(() => Math.random() - .5).slice(0, count);
   }
 
+  // Frequency data supplied for the current IELTS speaking season. Counts are
+  // deliberately softened below, so a very frequent topic is favoured without
+  // making every mock test feel identical.
+  const FREQUENCY_STATUS_FACTOR = { common: 1.25, new: 1, retained: 0.62 };
+  const PART1_FREQUENCY = {
+    "Growing Vegetables": { count: 994, status: "common" },
+    "Politeness": { count: 805, status: "new" },
+    "Rubbish": { count: 630, status: "new" },
+    "Tiredness": { count: 392, status: "new" },
+    "Travelling": { count: 301, status: "retained" },
+    "Paper": { count: 1036, status: "new" },
+    "Secondary Schools": { count: 637, status: "new" },
+    "Study": { count: 1463, status: "common" },
+    "Hometown": { count: 483, status: "common" },
+    "Accommodation": { count: 364, status: "common" },
+    "The Area You Live In": { count: 896, status: "common" },
+    "Names": { count: 329, status: "new" },
+    "Advertisements": { count: 406, status: "new" },
+    "Shoes": { count: 658, status: "new" },
+    "Public Gardens and Parks": { count: 273, status: "retained" },
+    "Cars": { count: 504, status: "retained" },
+    "Shopping": { count: 259, status: "retained" },
+    "Watches": { count: 1064, status: "retained" },
+    "Websites": { count: 483, status: "retained" },
+    "Tidiness": { count: 203, status: "retained" },
+    "Mirrors": { count: 273, status: "retained" },
+    "Teachers": { count: 322, status: "retained" },
+    "Social Media": { count: 161, status: "retained" },
+    "Music": { count: 490, status: "retained" },
+    "Science": { count: 245, status: "retained" },
+    "Singing": { count: 210, status: "retained" },
+    "Outer Space and Stars": { count: 196, status: "retained" },
+    "Clothes": { count: 217, status: "retained" },
+    "Headphones": { count: 154, status: "retained" },
+    "Jokes": { count: 105, status: "retained" },
+  };
+  const PART2_FREQUENCY = [
+    ["person who likes to make things by hand", 469, "new"], ["saved money to buy", 357, "new"],
+    ["film you didn’t like", 336, "new"], ["happy with the result", 294, "new"],
+    ["ambition that you have had", 287, "retained"], ["watched a famous person", 238, "new"],
+    ["enjoys learning history", 217, "new"], ["career in the medical field", 210, "retained"],
+    ["person who taught you", 210, "new"], ["favourite childhood friend", 203, "new"],
+    ["old person you know and respect", 203, "new"], ["athlete you admire", 189, "new"],
+    ["enjoyable evening", 154, "new"], ["really likes taking photos", 154, "new"],
+    ["popular person", 147, "new"], ["good at learning and speaking", 147, "retained"],
+    ["successful business person", 140, "retained"], ["got up early", 126, "retained"],
+    ["food people eat", 126, "retained"], ["advertisement with a famous person", 119, "new"],
+    ["new law", 112, "retained"], ["boring place", 112, "retained"], ["live sports event", 105, "retained"],
+    ["not interested in", 105, "new"], ["important decision you made in life", 98, "retained"],
+    ["good service", 98, "retained"], ["short trip", 98, "new"], ["loves to grow plants", 98, "retained"],
+    ["party you enjoyed", 91, "new"], ["worked in a group", 84, "retained"],
+    ["challenging technological", 77, "retained"], ["interesting video", 77, "retained"],
+    ["organized person", 70, "new"], ["helped to become healthier", 56, "new"],
+    ["plan that you had to change", 14, "new"], ["noisy place", 294, "new"],
+    ["natural place", 224, "new"], ["place you have travelled", 189, "retained"],
+    ["tall building", 189, "retained"], ["friend’s home", 147, "retained"],
+  ];
+
+  function frequencyWeight(record) {
+    // The square-root curve preserves the ranking while preventing the top
+    // item from being selected many times more often than the rest.
+    return Math.sqrt(record.count) * FREQUENCY_STATUS_FACTOR[record.status];
+  }
+
+  function weightedPick(items, weightFor) {
+    const weights = items.map(item => Math.max(0, Number(weightFor(item)) || 0));
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    if (!total) return sample(items, 1)[0];
+    let cursor = Math.random() * total;
+    for (let index = 0; index < items.length; index += 1) {
+      cursor -= weights[index];
+      if (cursor <= 0) return items[index];
+    }
+    return items.at(-1);
+  }
+
+  function weightedSample(items, count, weightFor) {
+    const pool = [...items];
+    const result = [];
+    while (pool.length && result.length < count) {
+      const picked = weightedPick(pool, weightFor);
+      result.push(picked);
+      pool.splice(pool.indexOf(picked), 1);
+    }
+    return result;
+  }
+
+  function part2Frequency(title) {
+    const normalized = title.toLowerCase();
+    const match = PART2_FREQUENCY.find(([phrase]) => normalized.includes(phrase));
+    return match ? { count: match[1], status: match[2] } : { count: 48, status: "retained" };
+  }
+
   function clean(text) {
     return String(text || "").replace(/\s+/g, " ").trim();
   }
@@ -87,13 +180,15 @@
       if (!topicMap.has(item.topic)) topicMap.set(item.topic, []);
       topicMap.get(item.topic).push(item.question);
     });
-    const topics = sample([...topicMap.keys()], Math.random() < .35 ? 2 : 3);
+    const topics = weightedSample([...topicMap.keys()], Math.random() < .35 ? 2 : 3,
+      topic => frequencyWeight(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }));
     const target = Math.floor(Math.random() * 5) + 8;
+    const topicPools = new Map(topics.map(topic => [topic, sample(topicMap.get(topic), topicMap.get(topic).length)]));
     const selected = [];
     let round = 0;
     while (selected.length < target && round < 8) {
       topics.forEach(topic => {
-        const candidates = topicMap.get(topic);
+        const candidates = topicPools.get(topic);
         if (selected.length < target && candidates[round]) selected.push({ part: 1, topic, question: candidates[round] });
       });
       round += 1;
@@ -271,7 +366,7 @@
 
   function beginPart2Prep() {
     state.phase = "part2prep";
-    state.part2Card = sample(bank.part2, 1)[0];
+    state.part2Card = weightedPick(bank.part2, card => frequencyWeight(part2Frequency(card.title)));
     els.partLabel.textContent = "PART 2 · LONG TURN";
     els.phaseTitle.textContent = "Preparation time";
     els.questionText.textContent = state.part2Card.title;
@@ -457,7 +552,7 @@
 
   setupRecognition();
   els.compatibilityNote.textContent = state.voiceSupported
-    ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。`
+    ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。已按考频加权：常考/新题优先，保留题穿插。`
     : "此浏览器不支持实时语音识别；仍可使用文字作答完成完整流程。建议使用最新版 Chrome 或 Edge。";
 
   els.startButton.addEventListener("click", beginExam);
