@@ -2,6 +2,7 @@
   "use strict";
 
   const bank = window.IELTS_BANK;
+  const answerBank = window.IELTS_ANSWERS || { part1: [], part2: [] };
   const $ = (id) => document.getElementById(id);
   const views = { welcome: $("welcomeView"), exam: $("examView"), results: $("resultsView") };
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -162,6 +163,18 @@
 
   function clean(text) {
     return String(text || "").replace(/\s+/g, " ").trim();
+  }
+
+  function questionKey(text) {
+    return clean(text).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  }
+
+  const standardAnswers = new Map(
+    [...answerBank.part1, ...answerBank.part2].map(item => [questionKey(item.question), item.answer])
+  );
+
+  function standardAnswerFor(question) {
+    return standardAnswers.get(questionKey(question)) || "题库中未提供这道题的参考答案（Part 3 通常只有追问题目）。";
   }
 
   function words(text) {
@@ -561,7 +574,8 @@
       <div class="review-item">
         <p class="review-part">Part ${answer.part}${answer.adaptive ? " · adaptive follow-up" : ""} · Question ${index + 1}</p>
         <p class="review-question">Q: ${escapeHtml(answer.question)}</p>
-        <p class="review-answer">A: ${escapeHtml(answer.text)}</p>
+        <p class="review-answer review-standard"><b>题库参考答案：</b>${escapeHtml(standardAnswerFor(answer.question))}</p>
+        <p class="review-answer review-your-answer"><b>你的本场回答：</b>${escapeHtml(answer.text)}</p>
       </div>
     `).join("") || "<p>本场没有保存到可回顾的回答。</p>";
   }
