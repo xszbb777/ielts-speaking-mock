@@ -357,12 +357,12 @@
   }
 
   function referenceAnswerFor(item) {
-    if (item.modelAnswer) return { source: "IELTS Part 3 自适应追问示范回答", text: item.modelAnswer };
-    const exact = standardAnswers.get(questionKey(item.question));
-    if (exact) return { source: "题库原题参考答案", text: exact };
     if (item.part === 3) {
+      if (item.modelAnswer) return { source: "IELTS Part 3 自适应追问示范回答", text: item.modelAnswer };
       return { source: "IELTS Part 3 高分示范回答", text: generatedPart3Answer(item.question, item.topic) };
     }
+    const exact = standardAnswers.get(questionKey(item.question));
+    if (exact) return { source: "题库原题参考答案", text: exact };
     return { source: "题库未匹配到参考答案", text: "这道题未在你提供的题库中找到对应参考答案。" };
   }
 
