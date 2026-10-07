@@ -173,8 +173,43 @@
     [...answerBank.part1, ...answerBank.part2].map(item => [questionKey(item.question), item.answer])
   );
 
-  function standardAnswerFor(question) {
-    return standardAnswers.get(questionKey(question)) || "题库中未提供这道题的参考答案（Part 3 通常只有追问题目）。";
+  const comparisonStopwords = new Set("do does did is are was were be been being have has had can could would should will may might why how what when where which who whom whose people person thing things your you their they them this that these those about with from into for and the a an of to in on at by as it its more most less very".split(" "));
+
+  function relatedPart1Answer(question) {
+    const target = new Set(words(question).filter(word => word.length > 3 && !comparisonStopwords.has(word)));
+    if (!target.size) return null;
+    const scored = answerBank.part1.map(item => {
+      const candidates = new Set(words(item.question).filter(word => word.length > 3 && !comparisonStopwords.has(word)));
+      const overlap = [...target].filter(word => candidates.has(word)).length;
+      return { item, overlap };
+    }).sort((a, b) => b.overlap - a.overlap);
+    return scored[0]?.overlap >= 2 ? scored[0].item : null;
+  }
+
+  function generatedPart3Answer(question, topic) {
+    const lower = question.toLowerCase();
+    const context = topic ? `When it comes to ${topic.toLowerCase()}, ` : "";
+    if (lower.startsWith("why")) {
+      return `${context}I think the main reason is that it has a direct effect on people's daily lives. It can make things more convenient or meaningful, so people naturally pay attention to it. For example, when people have a positive personal experience, they are usually more willing to support it.`;
+    }
+    if (lower.startsWith("how")) {
+      return `${context}one practical approach is to start with small, realistic changes rather than trying to change everything at once. Schools, families and the wider community can also make it easier by giving people clear information and useful opportunities to practise.`;
+    }
+    if (/do you think|should|is .* important|will .* change/.test(lower)) {
+      return `${context}yes, generally I think it is important, although it depends on the individual situation. It can bring clear benefits when it is handled thoughtfully, but people should also avoid taking it to an extreme and consider possible drawbacks.`;
+    }
+    return `${context}I think this is quite common today because people have different needs and experiences. In my view, the best solution is to keep a balanced attitude: recognise the benefits, but also think about the possible problems and make choices that are realistic.`;
+  }
+
+  function referenceAnswerFor(item) {
+    const exact = standardAnswers.get(questionKey(item.question));
+    if (exact) return { source: "题库原题参考答案", text: exact };
+    if (item.part === 3) {
+      const related = relatedPart1Answer(item.question);
+      if (related) return { source: `Part 1 相近题参考答案：${related.question}`, text: related.answer };
+      return { source: "根据本题生成的 Part 3 示范回答", text: generatedPart3Answer(item.question, item.topic) };
+    }
+    return { source: "题库未匹配到参考答案", text: "这道题未在你提供的题库中找到对应参考答案。" };
   }
 
   function words(text) {
@@ -570,14 +605,17 @@
     if (report.p2 && words(report.p2.text).length < 100) expansions.push("Part 2 还可以增加一个具体场景、一个感官细节，以及事情前后的变化，让讲话更接近两分钟。");
     if (!expansions.length) expansions.push("你的答案长度分配较均衡。下一步可在 Part 3 的例子后补一句影响或对比，提升观点的层次感。");
     els.expansionNotes.innerHTML = `<ul>${expansions.map(x => `<li>${x}</li>`).join("")}</ul>`;
-    els.answerReview.innerHTML = state.answers.map((answer, index) => `
+    els.answerReview.innerHTML = state.answers.map((answer, index) => {
+      const reference = referenceAnswerFor(answer);
+      return `
       <div class="review-item">
         <p class="review-part">Part ${answer.part}${answer.adaptive ? " · adaptive follow-up" : ""} · Question ${index + 1}</p>
         <p class="review-question">Q: ${escapeHtml(answer.question)}</p>
-        <p class="review-answer review-standard"><b>题库参考答案：</b>${escapeHtml(standardAnswerFor(answer.question))}</p>
+        <p class="review-answer review-standard"><b>${escapeHtml(reference.source)}：</b>${escapeHtml(reference.text)}</p>
         <p class="review-answer review-your-answer"><b>你的本场回答：</b>${escapeHtml(answer.text)}</p>
       </div>
-    `).join("") || "<p>本场没有保存到可回顾的回答。</p>";
+    `;
+    }).join("") || "<p>本场没有保存到可回顾的回答。</p>";
   }
 
   function escapeHtml(text) {
