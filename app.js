@@ -220,19 +220,6 @@
     [...answerBank.part1, ...answerBank.part2].map(item => [questionKey(item.question), item.answer])
   );
 
-  const comparisonStopwords = new Set("do does did is are was were be been being have has had can could would should will may might why how what when where which who whom whose people person thing things your you their they them this that these those about with from into for and the a an of to in on at by as it its more most less very".split(" "));
-
-  function relatedPart1Answer(question) {
-    const target = new Set(words(question).filter(word => word.length > 3 && !comparisonStopwords.has(word)));
-    if (!target.size) return null;
-    const scored = answerBank.part1.map(item => {
-      const candidates = new Set(words(item.question).filter(word => word.length > 3 && !comparisonStopwords.has(word)));
-      const overlap = [...target].filter(word => candidates.has(word)).length;
-      return { item, overlap };
-    }).sort((a, b) => b.overlap - a.overlap);
-    return scored[0]?.overlap >= 2 ? scored[0].item : null;
-  }
-
   const P3_PROFILES = {
     relationships: { reason: "People need trust, emotional support and a sense of belonging, so close relationships matter throughout life.", qualities: "A true friend should be reliable, honest and able to listen without judging too quickly.", prosCons: "Close relationships provide support, but they also need time, patience and clear communication to remain healthy.", how: "The most effective way is to spend regular time together, listen carefully and deal with small misunderstandings before they become bigger problems.", opinion: "Yes, I think it matters because supportive relationships can reduce stress and make people feel less isolated.", examples: "People often build friendships at school, university, work, clubs or during shared activities where they meet repeatedly." },
     happiness: { reason: "Positive emotions often spread because people copy the mood and behaviour of those around them.", qualities: "Adults who work with children need patience, empathy and the ability to notice small changes in behaviour.", prosCons: "Creative activities can improve mood and connection, although they are not a replacement for professional support when a child is seriously unhappy.", how: "Schools can use music, drama, drawing and group activities to give children safe ways to express their feelings.", opinion: "Yes, teachers should pay attention to children's wellbeing, but they also need to respect a child's privacy and avoid controlling every detail.", examples: "Music, films, public art and community performances can all create shared positive emotions." },
@@ -260,6 +247,55 @@
     media: { reason: "People choose films, books, videos and programmes that offer relaxation, useful information or a story they can relate to.", qualities: "Good media creators need originality, an understanding of their audience and the ability to communicate clearly.", prosCons: "Watching at home is convenient and cheap, while cinemas and live programmes offer a stronger shared atmosphere and fewer distractions.", how: "Viewers can choose reliable sources, compare perspectives and limit passive screen time to use media more thoughtfully.", opinion: "Films and books can both develop creativity; films make visual ideas immediate, while books leave more space for imagination.", examples: "Popular content often includes comedy, drama, sport, documentaries, practical tutorials and short entertainment videos." },
     animals: { reason: "People keep pets because companionship can reduce loneliness and teach responsibility, especially in families.", qualities: "Pet owners need patience, time, basic knowledge and a commitment to care for an animal over many years.", prosCons: "Pets bring companionship, but city living can make space, noise and welfare more difficult to manage.", how: "Schools can teach children about animals through visits, stories, science lessons and practical discussions about responsible care.", opinion: "Pets can be family members emotionally, but owners still need to make decisions based on the animal's real welfare needs.", examples: "Animal stories help children understand emotions, consequences and different ways of living." },
     ambition: { reason: "Ambitions give people direction and can motivate them to develop skills over a long period.", qualities: "Helpful parents encourage effort, curiosity and realistic planning rather than forcing one fixed dream on a child.", prosCons: "High ambitions can be motivating, but unrealistic pressure can harm confidence and wellbeing.", how: "People can turn an ambition into progress by setting small milestones, seeking feedback and adjusting plans when circumstances change.", opinion: "Parents should support and advise their children, but the final ambition should reflect the child's own interests and strengths.", examples: "People may aim for a meaningful career, financial security, creative achievement, travel or helping their community." },
+  };
+
+  // These are direct, high-band model answers for the high-priority Part 3
+  // sets. They are deliberately keyed by the actual question, never by a
+  // superficially similar Part 1 question.
+  const P3_MODEL_ANSWERS = {
+    "A Film You Didn’t Like": {
+      "What kinds of movies are the most popular in China?": "Commercial comedies, action films and emotionally engaging dramas tend to be popular because they are easy to watch with friends or family. In recent years, Chinese audiences have also shown growing interest in well-made domestic films with a strong cultural or historical setting.",
+      "What are the differences between watching movies at home and in a cinema?": "Watching at home is cheaper, more flexible and allows people to pause whenever they like. A cinema, by contrast, offers a large screen, better sound and a shared atmosphere, so it can make a visually impressive film feel more immersive.",
+      "Are movies more likely to make people creative than books?": "Not necessarily. Films can inspire people through vivid images, music and visual storytelling, but books often require readers to imagine the setting and characters for themselves. I would say books may encourage more active imagination, while films can provide a different kind of creative stimulus.",
+      "Can movies help people understand the cultural background of a country?": "Yes, to some extent. Films can show everyday language, family relationships, food, social values and historical events in a vivid context. However, viewers should remember that a film is only one perspective, so it is better to compare it with documentaries, books or reliable sources.",
+    },
+    "A Challenging Technological Problem": {
+      "What are the advantages and disadvantages of AI?": "AI can process large amounts of information quickly and support people in areas such as translation, healthcare and customer service. The main concerns are inaccurate outputs, bias, privacy risks and people relying on it without checking the result.",
+      "Should people today learn about AI technology?": "Yes, at least at a basic level. AI already affects study, work and daily services, so people need to understand both what it can do and where it can make mistakes. That knowledge helps them use it critically rather than blindly.",
+      "Should children learn to use AI?": "They should learn age-appropriate AI literacy, including how to ask useful questions, check information and protect privacy. The aim should be to support learning, not to let AI complete their thinking for them.",
+      "How can AI help in our lives?": "It can save time on routine tasks, provide accessibility tools such as speech-to-text, and help people organise information. Its value is greatest when a person still checks the result and remains responsible for the final decision.",
+      "Do you think students rely too much on AI?": "Some do, especially when they use it to produce work without understanding it. Used carefully, it can help students brainstorm or receive feedback, but over-reliance can weaken independent thinking and writing skills.",
+      "What can teachers do to stop students relying too much on AI?": "Teachers can design tasks that require personal examples, in-class discussion and an explanation of the student's reasoning. They should also teach students how to acknowledge AI use and evaluate its answers rather than simply banning the tool.",
+    },
+    "Medical Career": {
+      "Why do people choose to become doctors?": "Many people choose medicine because they want to help others and are interested in science and problem-solving. It is also a career in which they can see a clear social purpose in their work.",
+      "What are the challenges of being a doctor?": "The work can involve long hours, complex decisions and considerable emotional pressure, particularly when patients are seriously ill. Doctors also have to keep learning because medical knowledge and technology develop quickly.",
+      "Do doctors need good communication skills?": "Absolutely. Doctors need to explain complex information in plain language, listen to patients' concerns and check that patients understand their options. Good communication can improve trust and lead to better decisions about treatment.",
+      "Why are medical professionals respected?": "They are trusted with people's health and often work under pressure to relieve suffering or save lives. Their long training and sense of responsibility also make the role highly respected.",
+      "Do you think technology will replace doctors in the future?": "Technology will probably assist doctors rather than replace them. It can analyse data and handle routine tasks, but patients still need empathy, ethical judgement and someone accountable for an individual decision.",
+    },
+    "Athlete / Sports": {
+      "What qualities should a good athlete have?": "A good athlete needs discipline, resilience and the willingness to train consistently, not just natural ability. In team sports, communication and the ability to support teammates are equally important.",
+      "Is talent important for athletes?": "Talent gives an athlete a useful starting point, but it is rarely enough on its own. Long-term success normally depends on training, coaching, recovery and the mental strength to cope with setbacks.",
+      "Why do people admire athletes?": "People often admire athletes because their effort and performance are visible. A successful athlete can show what sustained practice and self-discipline can achieve, especially when they behave fairly under pressure.",
+      "Should children do sports?": "Yes, regular sport can improve children's physical health, confidence and social skills. The focus should be enjoyment and participation rather than putting every child under pressure to win.",
+      "Do children spend enough time doing sports nowadays?": "In many cases, probably not, because schoolwork and screen-based entertainment take up a great deal of time. Schools and families can help by making safe, low-pressure activities easy to access.",
+      "How can technology help athletes?": "Wearable devices and video analysis can monitor training load, technique and recovery. This can help athletes improve efficiently and reduce injuries, provided the data is interpreted by knowledgeable coaches.",
+    },
+    "Language Learning": {
+      "Why do people learn foreign languages?": "People learn languages for practical reasons such as study, work and travel, but also to communicate with people from other cultures. It can make information, friendships and career opportunities more accessible.",
+      "Is learning a foreign language important for students?": "Yes, because it develops communication skills and gives students access to international study and work opportunities. It can also make them more aware that different cultures may express ideas in different ways.",
+      "What is the best way to learn a language?": "A balanced approach works best: regular listening and speaking, useful vocabulary, and feedback on mistakes. The key is frequent meaningful use, rather than memorising long lists of words without context.",
+      "Why do children learn languages faster than adults?": "Children often have more time for repeated exposure and are less afraid of making mistakes. Adults can still learn very effectively, but they may have less time and need to overcome self-consciousness.",
+      "What are the difficulties of learning a new language?": "Common difficulties include pronunciation, limited vocabulary and the fear of speaking incorrectly. The hardest part is often finding enough regular opportunities to use the language beyond the classroom.",
+    },
+    "A Party You Enjoyed": {
+      "What would you do if you were disturbed by your neighbour’s party?": "I would first speak to the neighbour politely, especially if it was late or affecting sleep. If the noise continued, I would contact building management or the relevant local service rather than escalating the situation myself.",
+      "Why do some people like parties while others don’t?": "Some people enjoy the energy and chance to socialise, while others find noise, crowds or small talk tiring. Personality matters, but the size and atmosphere of the party matter as well.",
+      "Are music and dancing necessary at a party?": "No. They can create a lively mood, but a small gathering can be enjoyable simply because people have good food and time for meaningful conversation.",
+      "Do people in China prefer holding parties at home or in public places?": "It depends on the occasion. Small gatherings are often held at home because they feel relaxed, while restaurants or event spaces are more practical for larger celebrations because they provide room and reduce the cleaning work.",
+      "What are the differences between parties at home and those in public places?": "Home parties are usually more personal and flexible, but the host has to prepare and clean up. Public venues offer more space and services, although they cost more and can feel less private.",
+    },
   };
 
   function profileForPart3(topic) {
@@ -294,6 +330,8 @@
   }
 
   function generatedPart3Answer(question, topic) {
+    const direct = P3_MODEL_ANSWERS[topic]?.[question];
+    if (direct) return direct;
     const lower = question.toLowerCase();
     const profile = profileForPart3(topic);
     if (/disturbed by your neighbour.*party/.test(lower)) return "I would first speak to the neighbour politely, especially if it was late or the noise was affecting sleep. If the problem continued, I would contact building management or the relevant local service rather than starting a confrontation.";
@@ -304,6 +342,12 @@
     if (/when do people send gifts/.test(lower)) return P3_PROFILES.gifts.examples;
     if (/do people give gifts or red packets/.test(lower)) return "Both are common. Red packets are especially practical during traditional festivals and weddings, while gifts are often chosen when people want to make the gesture more personal.";
     if (/how does technology affect the way people spend their leisure/.test(lower)) return P3_PROFILES.leisure.prosCons;
+    if (/cultural background of a country/.test(lower)) return "Yes, to some extent. Films can show everyday language, family relationships, food, social values and historical events in a vivid context. However, a film presents only one perspective, so viewers should compare it with other reliable sources.";
+    if (/talent important for athletes/.test(lower)) return "Talent is helpful, but it is only a starting point. Consistent training, good coaching and mental resilience normally matter more for long-term athletic success.";
+    if (/doctors need good communication/.test(lower)) return "Yes. Doctors need to explain complicated information clearly, listen to concerns and make sure patients understand their options. This is essential for trust and informed decisions.";
+    if (/challenges of being a doctor/.test(lower)) return "Doctors face long hours, high-stakes decisions and emotional pressure, especially when patients are seriously ill. They also have to keep updating their knowledge throughout their careers.";
+    if (/advantage.*disadvantage.*advertisement/.test(lower)) return "Advertisements help consumers learn about products and allow businesses to reach customers. However, they can also encourage unnecessary spending or make exaggerated claims, so people need to evaluate them critically.";
+    if (/what makes a popular tv|what kinds of tv|online programs are popular/.test(lower)) return "A popular programme usually has a clear theme, engaging people and content that viewers can easily discuss or share. In China, dramas, variety shows, sport, documentaries and short online programmes all attract large audiences.";
     if (/what qualities|what should .* have/.test(lower)) return profile.qualities;
     if (/advantages and disadvantages|differences between|difference between/.test(lower)) return profile.prosCons;
     if (lower.startsWith("why") || /what factors/.test(lower)) return profile.reason;
@@ -313,12 +357,11 @@
   }
 
   function referenceAnswerFor(item) {
+    if (item.modelAnswer) return { source: "IELTS Part 3 自适应追问示范回答", text: item.modelAnswer };
     const exact = standardAnswers.get(questionKey(item.question));
     if (exact) return { source: "题库原题参考答案", text: exact };
     if (item.part === 3) {
-      const related = relatedPart1Answer(item.question);
-      if (related) return { source: `Part 1 相近题参考答案：${related.question}`, text: related.answer };
-      return { source: "根据本题生成的 Part 3 示范回答", text: generatedPart3Answer(item.question, item.topic) };
+      return { source: "IELTS Part 3 高分示范回答", text: generatedPart3Answer(item.question, item.topic) };
     }
     return { source: "题库未匹配到参考答案", text: "这道题未在你提供的题库中找到对应参考答案。" };
   }
@@ -587,7 +630,39 @@
 
   const stopwords = new Set("describe talk about person time place thing your you have had that who what where when why how this with from into before after their there they people should could would does are were being been some very more most much many".split(" "));
 
+  // Use an explicit P2-to-P3 route whenever the supplied bank contains one.
+  // This avoids choosing a group merely because two titles share a common word.
+  const P2_TO_P3_TOPIC = [
+    [/organized person|organized a happy event/, "Organizing a Happy Event"],
+    [/difficult and was successful/, "Difficult & Successful Person"],
+    [/taught you|new skill.*child/, "Learning a New Skill as a Child"],
+    [/happy person/, "Happiness"], [/learning history/, "Exciting Book"],
+    [/taking photos|lesson that impressed/, "A Lesson That Impressed You"],
+    [/old person|grow plants/, "Old People"], [/popular person/, "Popular/Famous People"],
+    [/athlete|live sports/, "Athlete / Sports"], [/healthier|fitter/, "Athlete / Sports"],
+    [/make things by hand/, "Learning a New Skill as a Child"], [/successful business/, "Successful Business Person"],
+    [/speaking new languages|foreign language/, "Language Learning"], [/medical field/, "Medical Career"],
+    [/childhood friend/, "Childhood Friend"], [/save.*time/, "A Change That Helps You Save Time"],
+    [/wastes your time/, "An Activity That Wastes Your Time"], [/short trip/, "A Short Trip You Often Do but Don’t Like"],
+    [/changed an important decision/, "Changing an Important Decision"], [/important decision.*happy/, "An Important Decision You Were Happy With"],
+    [/lost something/, "Losing Something in a Public Place"], [/good service/, "Good Service / Shopping"],
+    [/expensive gift|gift.*friend/, "Gift for a Friend"], [/party/, "A Party You Enjoyed"],
+    [/evening.*friends/, "An Enjoyable Evening With Friends"], [/not interested/, "Someone Told You Something You Weren’t Interested In"],
+    [/famous person.*interview/, "Watching a Famous Person Being Interviewed"], [/message.*reply/, "Message / Email Taking a Long Time to Reply"],
+    [/worked in a group/, "Working in a Group"], [/technological problem/, "A Challenging Technological Problem"],
+    [/special day/, "A Special Day Out That Didn’t Cost Much"], [/plan.*change/, "Changing a Plan"],
+    [/got up early/, "Getting Up Early"], [/special cake/, "A Special Cake"], [/exciting book/, "Exciting Book"],
+    [/food.*special event/, "Food for a Special Event"], [/film you didn/, "A Film You Didn’t Like"],
+    [/interesting video/, "An Interesting Video"], [/tv show|online program/, "TV Show / Online Program"],
+    [/advertisement/, "Advertisement With a Famous Person"], [/animals/, "A Story/Book With Animals"],
+    [/environmental protection/, "Environmental Law / Regulation"], [/new law/, "A New Law You Would Like to Introduce"],
+    [/ambition/, "A Long-term Ambition"], [/travelled|natural place|city|place.*visit|noisy place|crowded place|building|river|lake/, "A Short Trip You Often Do but Don’t Like"],
+  ];
+
   function relevantPart3Group(cardTitle) {
+    const mappedTopic = P2_TO_P3_TOPIC.find(([pattern]) => pattern.test(cardTitle))?.[1];
+    const mappedGroup = mappedTopic && bank.part3.find(group => group.topic === mappedTopic);
+    if (mappedGroup) return mappedGroup;
     const cueWords = new Set(words(cardTitle).filter(w => w.length > 3 && !stopwords.has(w)));
     const scored = bank.part3.map(group => {
       const groupWords = words(`${group.topic} ${group.questions.join(" ")}`);
@@ -617,14 +692,45 @@
   }
 
   function maybeAddAdaptiveFollowUp(answer) {
-    if (state.part3AdaptiveAdded || state.index < 1 || state.queue.length >= 6 || words(answer).length < 8) return;
+    if (state.part3AdaptiveAdded || state.queue.length >= 6 || words(answer).length < 8) return;
     const content = words(answer).filter(w => w.length > 5 && !stopwords.has(w));
     if (!content.length) return;
     const keyword = content.sort((a, b) => b.length - a.length)[0];
-    const follow = `You mentioned ${keyword}. Why do you think that is important in this context?`;
-    state.queue.splice(state.index + 1, 0, { part: 3, topic: state.part3Group.topic, question: follow, adaptive: true });
+    const followUp = adaptiveFollowUpFor(state.part3Group.topic, keyword);
+    state.queue.splice(state.index + 1, 0, {
+      part: 3, topic: state.part3Group.topic, question: followUp.question,
+      modelAnswer: followUp.modelAnswer, adaptive: true,
+    });
     state.part3Target = Math.min(6, Math.max(state.part3Target, state.queue.length));
     state.part3AdaptiveAdded = true;
+  }
+
+  function adaptiveFollowUpFor(topic, keyword) {
+    const name = topic.toLowerCase();
+    if (/film|video|tv|book|advertisement/.test(name)) return {
+      question: `You mentioned ${keyword}. How can viewers judge whether that influence is positive or negative?`,
+      modelAnswer: "Viewers should ask whether the content provides reliable information, encourages thoughtful behaviour and represents people fairly. It is also sensible to compare different sources rather than accepting one film, video or advertisement as the whole truth.",
+    };
+    if (/technological|ai/.test(name)) return {
+      question: `You mentioned ${keyword}. What safeguards would be needed if AI were used more widely in that area?`,
+      modelAnswer: "There should be clear rules on privacy, human oversight and responsibility when an error occurs. People also need a way to question an automated decision, especially when it affects education, health or employment.",
+    };
+    if (/language|medical|learning|school/.test(name)) return {
+      question: `You mentioned ${keyword}. What could schools or teachers do to improve that situation?`,
+      modelAnswer: "They could provide regular practice, useful feedback and a supportive environment where mistakes are treated as part of learning. Clear goals and practical activities would also make the skill feel more relevant.",
+    };
+    if (/sports|athlete/.test(name)) return {
+      question: `You mentioned ${keyword}. Do you think that matters more for professional athletes or for children doing sport?`,
+      modelAnswer: "It matters to both groups, but in different ways. Professionals need it to perform consistently under pressure, whereas children need it mainly to stay motivated, safe and willing to keep participating.",
+    };
+    if (/law|regulation|rules/.test(name)) return {
+      question: `You mentioned ${keyword}. Who should be mainly responsible for improving that: families, schools or the government?`,
+      modelAnswer: "They all have a role. Families establish early habits, schools explain expectations in daily situations, and the government provides fair laws and enforcement. The most effective approach is consistent messages from all three.",
+    };
+    return {
+      question: `You mentioned ${keyword}. Could you explain how that might affect people in the longer term?`,
+      modelAnswer: "In the longer term, it can shape people's habits, opportunities and relationships. The effect is usually positive when people have enough information and support, but it can become harmful if it creates pressure or inequality.",
+    };
   }
 
   function finishExam() {
