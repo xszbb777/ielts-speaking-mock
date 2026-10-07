@@ -36,7 +36,7 @@
     interimTranscript: $("interimTranscript"), manualAnswer: $("manualAnswer"), micButton: $("micButton"),
     submitAnswer: $("submitAnswer"), repeatButton: $("repeatButton"), questionCounter: $("questionCounter"),
     overallBand: $("overallBand"), scoreGrid: $("scoreGrid"), metrics: $("metrics"),
-    memorisedNotes: $("memorisedNotes"), expansionNotes: $("expansionNotes"), restartButton: $("restartButton"),
+    memorisedNotes: $("memorisedNotes"), expansionNotes: $("expansionNotes"), answerReview: $("answerReview"), restartButton: $("restartButton"),
     downloadButton: $("downloadButton"),
   };
 
@@ -101,11 +101,32 @@
     ["natural place", 224, "new"], ["place you have travelled", 189, "retained"],
     ["tall building", 189, "retained"], ["friend’s home", 147, "retained"],
   ];
+  // The starred lists the learner supplied are a separate, more immediate
+  // priority signal. It applies on top of the seasonal frequency data.
+  const PART1_STAR_PRIORITY = {
+    "Study": 7, "Accommodation": 7, "The Area You Live In": 7, "Hometown": 7,
+    "Rubbish": 6, "Paper": 6, "Websites": 6, "Social Media": 5, "Shopping": 5,
+    "Headphones": 5, "Advertisements": 4, "Shoes": 4, "Politeness": 4,
+    "Clothes": 4, "Science": 4,
+  };
+  const PART2_STAR_PRIORITY = [
+    ["law or regulation about environmental", 5], ["watched a famous person", 5],
+    ["old person you know and respect", 5], ["food people eat", 5], ["live sports event", 5],
+    ["successful business person", 5], ["person who likes to make things by hand", 4],
+    ["exciting book", 4], ["challenging technological", 4], ["public building", 4],
+    ["good at learning and speaking", 4], ["loves to grow plants", 4],
+    ["enjoys learning history", 3], ["film you didn’t like", 3], ["party you enjoyed", 3],
+    ["popular person", 3], ["advertisement with a famous person", 3], ["crowded place", 3],
+  ];
+
+  function starBoost(stars = 0) {
+    return stars >= 7 ? 3 : stars === 6 ? 2.5 : stars === 5 ? 2 : stars === 4 ? 1.55 : stars === 3 ? 1.2 : 1;
+  }
 
   function frequencyWeight(record) {
     // The square-root curve preserves the ranking while preventing the top
     // item from being selected many times more often than the rest.
-    return Math.sqrt(record.count) * FREQUENCY_STATUS_FACTOR[record.status];
+    return Math.sqrt(record.count) * FREQUENCY_STATUS_FACTOR[record.status] * starBoost(record.stars);
   }
 
   function weightedPick(items, weightFor) {
@@ -134,7 +155,9 @@
   function part2Frequency(title) {
     const normalized = title.toLowerCase();
     const match = PART2_FREQUENCY.find(([phrase]) => normalized.includes(phrase));
-    return match ? { count: match[1], status: match[2] } : { count: 48, status: "retained" };
+    const priority = PART2_STAR_PRIORITY.find(([phrase]) => normalized.includes(phrase));
+    const frequency = match ? { count: match[1], status: match[2] } : { count: 48, status: "retained" };
+    return { ...frequency, stars: priority?.[1] || 0 };
   }
 
   function clean(text) {
@@ -181,7 +204,7 @@
       topicMap.get(item.topic).push(item.question);
     });
     const topics = weightedSample([...topicMap.keys()], Math.random() < .35 ? 2 : 3,
-      topic => frequencyWeight(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }));
+      topic => frequencyWeight({ ...(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }), stars: PART1_STAR_PRIORITY[topic] || 0 }));
     const target = Math.floor(Math.random() * 5) + 8;
     const topicPools = new Map(topics.map(topic => [topic, sample(topicMap.get(topic), topicMap.get(topic).length)]));
     const selected = [];
@@ -449,7 +472,7 @@
   }
 
   function band(value) {
-    return Math.max(4.5, Math.min(8.5, Math.round(value * 2) / 2));
+    return Math.max(4, Math.min(7.5, Math.round(value * 2) / 2));
   }
 
   function analyse() {
@@ -465,19 +488,26 @@
     const connectors = (allText.match(/\b(however|although|because|therefore|while|whereas|for example|in contrast|as a result|on the other hand)\b/gi) || []).length;
     const sentences = Math.max(1, (allText.match(/[.!?]+/g) || []).length);
     const avgSentence = allWords.length / sentences;
-    const confidenceValues = valid.map(a => a.confidence).filter(Number.isFinite);
-    const confidence = confidenceValues.length ? confidenceValues.reduce((a, b) => a + b, 0) / confidenceValues.length : .72;
     const p2 = valid.find(a => a.part === 2);
+    const completeAnswers = valid.filter(a => words(a.text).length >= (a.part === 1 ? 8 : a.part === 2 ? 90 : 22));
+    const repetitions = (allText.match(/\b(\w+)(?:\s+\1){1,}\b/gi) || []).length;
 
-    let fluency = 5.2;
-    if (wpm >= 85 && wpm <= 175) fluency += 1;
-    if (fillerRate < .035) fluency += .7;
-    if ((p2 ? words(p2.text).length : 0) >= 100) fluency += .7;
-    if (valid.filter(a => words(a.text).length >= 12).length >= valid.length * .7) fluency += .5;
+    // Speech-recognition transcripts usually omit pauses and fillers, so their
+    // absence is no longer treated as proof of fluent delivery.
+    let fluency = 4.2;
+    if (wpm >= 85 && wpm <= 165) fluency += .45;
+    else if (wpm >= 65 && wpm < 85) fluency += .2;
+    if ((p2 ? words(p2.text).length : 0) >= 115) fluency += .3;
+    if (completeAnswers.length >= valid.length * .7) fluency += .3;
+    fluency -= Math.min(.5, repetitions * .12);
+    fluency -= fillerRate >= .055 ? .35 : fillerRate >= .035 ? .15 : 0;
 
-    let lexical = 5.1 + Math.min(1.25, Math.max(0, uniqueRatio - .28) * 4) + Math.min(.9, longRatio * 7);
-    let grammar = 5.1 + Math.min(1.25, connectors / Math.max(2, valid.length / 2)) + (avgSentence >= 9 && avgSentence <= 25 ? .8 : .25);
-    let pronunciation = 5.2 + Math.min(2.2, Math.max(0, confidence - .45) * 5.5) + (wpm >= 80 && wpm <= 180 ? .35 : 0);
+    let lexical = 4.6 + Math.min(.95, Math.max(0, uniqueRatio - .28) * 3.2) + Math.min(.55, longRatio * 4.5);
+    let grammar = 4.6 + Math.min(.9, connectors / Math.max(2, valid.length / 2)) + (avgSentence >= 9 && avgSentence <= 25 ? .45 : .1);
+    // Do not infer pronunciation quality from an automatic transcript. This
+    // neutral placeholder prevents recognition confidence from inflating a band.
+    let pronunciation = 5.0;
+    if (fillerRate >= .055 || repetitions >= 3) pronunciation -= .25;
 
     const scores = {
       "Fluency & Coherence": band(fluency),
@@ -486,7 +516,7 @@
       "Pronunciation": band(pronunciation),
     };
     const overall = band(Object.values(scores).reduce((a, b) => a + b, 0) / 4);
-    return { scores, overall, wpm, fillers, uniqueRatio, confidence, valid, p2 };
+    return { scores, overall, wpm, fillers, uniqueRatio, repetitions, valid, p2 };
   }
 
   function renderResults() {
@@ -496,7 +526,7 @@
       "Fluency & Coherence": "节奏、停顿与观点衔接",
       "Lexical Resource": "词汇范围与表达准确度",
       "Grammar": "句式变化与语法控制",
-      "Pronunciation": "识别稳定度与口语清晰度",
+      "Pronunciation": "无法由转写可靠评分，保持中性",
     };
     els.scoreGrid.innerHTML = Object.entries(report.scores).map(([name, score]) => `
       <div class="score-card"><p>${name}<br><small>${descriptions[name]}</small></p><b>${score.toFixed(1)}</b></div>
@@ -527,6 +557,13 @@
     if (report.p2 && words(report.p2.text).length < 100) expansions.push("Part 2 还可以增加一个具体场景、一个感官细节，以及事情前后的变化，让讲话更接近两分钟。");
     if (!expansions.length) expansions.push("你的答案长度分配较均衡。下一步可在 Part 3 的例子后补一句影响或对比，提升观点的层次感。");
     els.expansionNotes.innerHTML = `<ul>${expansions.map(x => `<li>${x}</li>`).join("")}</ul>`;
+    els.answerReview.innerHTML = state.answers.map((answer, index) => `
+      <div class="review-item">
+        <p class="review-part">Part ${answer.part}${answer.adaptive ? " · adaptive follow-up" : ""} · Question ${index + 1}</p>
+        <p class="review-question">Q: ${escapeHtml(answer.question)}</p>
+        <p class="review-answer">A: ${escapeHtml(answer.text)}</p>
+      </div>
+    `).join("") || "<p>本场没有保存到可回顾的回答。</p>";
   }
 
   function escapeHtml(text) {
