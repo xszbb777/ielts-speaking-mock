@@ -133,6 +133,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .review-item .review-part { color: var(--cyan); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .review-item .review-question { margin-top: 7px; color: #f1f6fb; font-weight: 600; }
 .review-item .review-answer { margin-top: 10px; color: #bac8d6; white-space: pre-wrap; }
+.review-item .review-standard { color: #d6e7f8; }
+.review-item .review-your-answer { color: var(--muted); font-size: 13px; }
 .result-caveat { margin: 18px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .result-actions { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
 .result-actions .secondary-button { margin-top: 20px; }
