@@ -119,6 +119,14 @@
     ["enjoys learning history", 3], ["film you didn’t like", 3], ["party you enjoyed", 3],
     ["popular person", 3], ["advertisement with a famous person", 3], ["crowded place", 3],
   ];
+  // The three learner-provided priority charts are the default sampling pool.
+  // A small outside chance keeps the mock realistic without overwhelming this list.
+  const FEATURED_PART1_TOPICS = new Set(Object.keys(PART1_STAR_PRIORITY));
+
+  function isFeaturedPart2(title) {
+    const normalized = title.toLowerCase();
+    return PART2_STAR_PRIORITY.some(([phrase]) => normalized.includes(phrase));
+  }
 
   function starBoost(stars = 0) {
     return stars >= 7 ? 3 : stars === 6 ? 2.5 : stars === 5 ? 2 : stars === 4 ? 1.55 : stars === 3 ? 1.2 : 1;
@@ -315,7 +323,10 @@
       if (!topicMap.has(item.topic)) topicMap.set(item.topic, []);
       topicMap.get(item.topic).push(item.question);
     });
-    const topics = weightedSample([...topicMap.keys()], Math.random() < .35 ? 2 : 3,
+    const allTopics = [...topicMap.keys()];
+    const featuredTopics = allTopics.filter(topic => FEATURED_PART1_TOPICS.has(topic));
+    const candidateTopics = featuredTopics.length && Math.random() < .85 ? featuredTopics : allTopics;
+    const topics = weightedSample(candidateTopics, Math.random() < .35 ? 2 : 3,
       topic => frequencyWeight({ ...(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }), stars: PART1_STAR_PRIORITY[topic] || 0 }));
     const target = Math.floor(Math.random() * 5) + 8;
     const topicPools = new Map(topics.map(topic => [topic, sample(topicMap.get(topic), topicMap.get(topic).length)]));
@@ -501,7 +512,9 @@
 
   function beginPart2Prep() {
     state.phase = "part2prep";
-    state.part2Card = weightedPick(bank.part2, card => frequencyWeight(part2Frequency(card.title)));
+    const featuredCards = bank.part2.filter(card => isFeaturedPart2(card.title));
+    const part2Pool = featuredCards.length && Math.random() < .85 ? featuredCards : bank.part2;
+    state.part2Card = weightedPick(part2Pool, card => frequencyWeight(part2Frequency(card.title)));
     els.partLabel.textContent = "PART 2 · LONG TURN";
     els.phaseTitle.textContent = "Preparation time";
     els.questionText.textContent = state.part2Card.title;
@@ -705,7 +718,7 @@
 
   setupRecognition();
   els.compatibilityNote.textContent = state.voiceSupported
-    ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。已按考频加权：常考/新题优先，保留题穿插。`
+    ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。85% 概率优先从你标星图内的 Part 1 / Part 2 题目抽取。`
     : "此浏览器不支持实时语音识别；仍可使用文字作答完成完整流程。建议使用最新版 Chrome 或 Edge。";
 
   els.startButton.addEventListener("click", beginExam);
