@@ -6,6 +6,7 @@
   const $ = (id) => document.getElementById(id);
   const views = { welcome: $("welcomeView"), exam: $("examView"), results: $("resultsView") };
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const HISTORY_KEY = "ielts-speaking-mock-question-history-v1";
 
   const state = {
     phase: "welcome",
@@ -30,7 +31,7 @@
   };
 
   const els = {
-    sessionState: $("sessionState"), compatibilityNote: $("compatibilityNote"), startButton: $("startButton"),
+    sessionState: $("sessionState"), compatibilityNote: $("compatibilityNote"), startButton: $("startButton"), resetHistoryButton: $("resetHistoryButton"),
     partLabel: $("partLabel"), phaseTitle: $("phaseTitle"), timer: $("timer"), progressFill: $("progressFill"),
     questionText: $("questionText"), cueList: $("cueList"), prepPanel: $("prepPanel"), notes: $("notes"),
     answerPanel: $("answerPanel"), voiceStatus: $("voiceStatus"), wave: $("wave"), transcriptBox: $("transcriptBox"),
@@ -43,6 +44,38 @@
 
   function sample(items, count) {
     return [...items].sort(() => Math.random() - .5).slice(0, count);
+  }
+
+  function loadHistory() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "{}");
+      return { part1Topics: Array.isArray(saved.part1Topics) ? saved.part1Topics : [], part2Cards: Array.isArray(saved.part2Cards) ? saved.part2Cards : [] };
+    } catch (_) {
+      return { part1Topics: [], part2Cards: [] };
+    }
+  }
+
+  const questionHistory = loadHistory();
+
+  function saveHistory() {
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(questionHistory)); } catch (_) { /* private browsing can disable storage */ }
+  }
+
+  function selectWithHistory(items, count, historyField, keyFor, weightFor) {
+    const seen = new Set(questionHistory[historyField]);
+    let unseen = items.filter(item => !seen.has(keyFor(item)));
+    if (!unseen.length) {
+      questionHistory[historyField] = [];
+      unseen = [...items];
+    }
+    const selected = weightedSample(unseen, Math.min(count, unseen.length), weightFor);
+    if (selected.length < count) {
+      const fallback = items.filter(item => !selected.includes(item));
+      selected.push(...weightedSample(fallback, count - selected.length, weightFor));
+    }
+    questionHistory[historyField] = [...new Set([...questionHistory[historyField], ...selected.map(keyFor)])];
+    saveHistory();
+    return selected;
   }
 
   // Frequency data supplied for the current IELTS speaking season. Counts are
@@ -326,7 +359,7 @@
     const allTopics = [...topicMap.keys()];
     const featuredTopics = allTopics.filter(topic => FEATURED_PART1_TOPICS.has(topic));
     const candidateTopics = featuredTopics.length && Math.random() < .85 ? featuredTopics : allTopics;
-    const topics = weightedSample(candidateTopics, Math.random() < .35 ? 2 : 3,
+    const topics = selectWithHistory(candidateTopics, Math.random() < .35 ? 2 : 3, "part1Topics", topic => topic,
       topic => frequencyWeight({ ...(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }), stars: PART1_STAR_PRIORITY[topic] || 0 }));
     const target = Math.floor(Math.random() * 5) + 8;
     const topicPools = new Map(topics.map(topic => [topic, sample(topicMap.get(topic), topicMap.get(topic).length)]));
@@ -514,7 +547,8 @@
     state.phase = "part2prep";
     const featuredCards = bank.part2.filter(card => isFeaturedPart2(card.title));
     const part2Pool = featuredCards.length && Math.random() < .85 ? featuredCards : bank.part2;
-    state.part2Card = weightedPick(part2Pool, card => frequencyWeight(part2Frequency(card.title)));
+    state.part2Card = selectWithHistory(part2Pool, 1, "part2Cards", card => card.title,
+      card => frequencyWeight(part2Frequency(card.title)))[0];
     els.partLabel.textContent = "PART 2 · LONG TURN";
     els.phaseTitle.textContent = "Preparation time";
     els.questionText.textContent = state.part2Card.title;
@@ -722,6 +756,12 @@
     : "此浏览器不支持实时语音识别；仍可使用文字作答完成完整流程。建议使用最新版 Chrome 或 Edge。";
 
   els.startButton.addEventListener("click", beginExam);
+  els.resetHistoryButton.addEventListener("click", () => {
+    questionHistory.part1Topics = [];
+    questionHistory.part2Cards = [];
+    saveHistory();
+    els.compatibilityNote.textContent = "抽题记录已重置。下一场将从优先题范围重新开始抽取。";
+  });
   els.micButton.addEventListener("click", () => state.listening ? stopRecognition() : startRecognition());
   els.submitAnswer.addEventListener("click", () => submitCurrentAnswer(false));
   els.manualAnswer.addEventListener("input", updateSubmitAvailability);
