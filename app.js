@@ -7,6 +7,7 @@
   const views = { welcome: $("welcomeView"), exam: $("examView"), results: $("resultsView") };
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const HISTORY_KEY = "ielts-speaking-mock-question-history-v1";
+  const AUDIO_ONLY_KEY = "ielts-speaking-mock-audio-only-v1";
 
   const state = {
     phase: "welcome",
@@ -28,10 +29,11 @@
     part3Target: 5,
     part3AdaptiveAdded: false,
     voiceSupported: Boolean(SpeechRecognition),
+    audioOnly: loadAudioOnlyPreference(),
   };
 
   const els = {
-    sessionState: $("sessionState"), compatibilityNote: $("compatibilityNote"), startButton: $("startButton"), resetHistoryButton: $("resetHistoryButton"),
+    sessionState: $("sessionState"), compatibilityNote: $("compatibilityNote"), startButton: $("startButton"), resetHistoryButton: $("resetHistoryButton"), audioOnlyToggle: $("audioOnlyToggle"),
     partLabel: $("partLabel"), phaseTitle: $("phaseTitle"), timer: $("timer"), progressFill: $("progressFill"),
     questionText: $("questionText"), cueList: $("cueList"), prepPanel: $("prepPanel"), notes: $("notes"),
     answerPanel: $("answerPanel"), voiceStatus: $("voiceStatus"), wave: $("wave"), transcriptBox: $("transcriptBox"),
@@ -53,6 +55,10 @@
     } catch (_) {
       return { part1Topics: [], part2Cards: [] };
     }
+  }
+
+  function loadAudioOnlyPreference() {
+    try { return localStorage.getItem(AUDIO_ONLY_KEY) !== "false"; } catch (_) { return true; }
   }
 
   const questionHistory = loadHistory();
@@ -413,7 +419,8 @@
     const item = state.queue[state.index];
     if (!item) return;
     els.cueList.classList.add("hidden");
-    els.questionText.textContent = item.question;
+    const hideQuestionText = state.audioOnly && (state.phase === "part1" || state.phase === "part3");
+    els.questionText.textContent = hideQuestionText ? "Listen to the examiner’s question." : item.question;
     els.questionCounter.textContent = `Question ${state.index + 1} of ${state.queue.length}`;
     els.progressFill.style.width = `${((state.index + 1) / state.queue.length) * 100}%`;
     els.partLabel.textContent = state.phase === "part1" ? "PART 1 · INTERVIEW" : "PART 3 · DISCUSSION";
@@ -751,6 +758,7 @@
   }
 
   setupRecognition();
+  els.audioOnlyToggle.checked = state.audioOnly;
   els.compatibilityNote.textContent = state.voiceSupported
     ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。85% 概率优先从你标星图内的 Part 1 / Part 2 题目抽取。`
     : "此浏览器不支持实时语音识别；仍可使用文字作答完成完整流程。建议使用最新版 Chrome 或 Edge。";
@@ -762,10 +770,19 @@
     saveHistory();
     els.compatibilityNote.textContent = "抽题记录已重置。下一场将从优先题范围重新开始抽取。";
   });
+  els.audioOnlyToggle.addEventListener("change", () => {
+    state.audioOnly = els.audioOnlyToggle.checked;
+    try { localStorage.setItem(AUDIO_ONLY_KEY, String(state.audioOnly)); } catch (_) { /* preference remains for this visit */ }
+  });
   els.micButton.addEventListener("click", () => state.listening ? stopRecognition() : startRecognition());
   els.submitAnswer.addEventListener("click", () => submitCurrentAnswer(false));
   els.manualAnswer.addEventListener("input", updateSubmitAvailability);
-  els.repeatButton.addEventListener("click", () => speak(els.questionText.textContent));
+  els.repeatButton.addEventListener("click", () => {
+    const prompt = state.phase === "part2prep" || state.phase === "part2speak"
+      ? state.part2Card?.title
+      : state.queue[state.index]?.question;
+    if (prompt) speak(prompt);
+  });
   els.restartButton.addEventListener("click", beginExam);
   els.downloadButton.addEventListener("click", downloadTranscript);
 })();
