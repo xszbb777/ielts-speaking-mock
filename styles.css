@@ -126,6 +126,13 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .metric { padding: 14px; border-top: 1px solid rgba(85,168,255,.35); }
 .metric b { display: block; font-size: 24px; }
 .metric span { color: var(--muted); font-size: 12px; }
+.review-intro { margin: -6px 0 18px; color: var(--muted); font-size: 13px; }
+.answer-review { display: grid; gap: 12px; }
+.review-item { padding: 16px; border-left: 2px solid rgba(97,232,210,.55); background: rgba(4,14,27,.55); }
+.review-item p { margin: 0; }
+.review-item .review-part { color: var(--cyan); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+.review-item .review-question { margin-top: 7px; color: #f1f6fb; font-weight: 600; }
+.review-item .review-answer { margin-top: 10px; color: #bac8d6; white-space: pre-wrap; }
 .result-caveat { margin: 18px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .result-actions { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
 .result-actions .secondary-button { margin-top: 20px; }
