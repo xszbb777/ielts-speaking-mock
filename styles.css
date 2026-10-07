@@ -59,6 +59,8 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .brief-row p { margin: 15px 0 0; color: #afbed0; line-height: 1.55; }
 .brief-row b { color: var(--ink); }
 .setup-note, .privacy-note { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.listening-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 0; color: #c4d2e1; font-size: 14px; cursor: pointer; }
+.listening-toggle input { width: 16px; height: 16px; accent-color: var(--cyan); }
 .primary-button, .secondary-button { min-height: 52px; border-radius: 4px; padding: 0 24px; border: 1px solid transparent; font-weight: 750; }
 .primary-button { margin-top: 20px; color: #041523; background: linear-gradient(135deg, var(--cyan), #7fc7ff); box-shadow: 0 15px 40px rgba(71, 188, 208, .16); }
 .secondary-button { color: var(--ink); background: transparent; border-color: rgba(172,197,226,.3); }
