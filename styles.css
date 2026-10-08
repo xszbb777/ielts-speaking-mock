@@ -116,9 +116,11 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .band-orbit b { margin: 4px 0; font-family: Georgia, serif; font-size: 68px; font-weight: 500; line-height: 1; }
 .score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 45px; }
 .score-card { padding: 22px; border: 1px solid var(--line); background: var(--panel); }
-.score-card p { min-height: 42px; margin: 0; color: #b4c3d4; font-size: 14px; line-height: 1.45; }
+.score-card p { min-height: 58px; margin: 0; color: #b4c3d4; font-size: 14px; line-height: 1.45; }
 .score-card b { display: block; margin-top: 18px; font-family: Georgia, serif; font-size: 42px; font-weight: 500; }
 .score-card small { color: var(--cyan); }
+.score-card .score-evidence { min-height: 0; margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.scoring-note { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
 .report-grid article { padding: 26px; border: 1px solid var(--line); background: rgba(10,23,39,.73); }
 .report-grid article.wide { grid-column: 1 / -1; }
@@ -128,6 +130,11 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
 .metric { padding: 14px; border-top: 1px solid rgba(85,168,255,.35); }
 .metric b { display: block; font-size: 24px; }
 .metric span { color: var(--muted); font-size: 12px; }
+.part-feedback { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.part-diagnosis { padding: 18px; border-top: 2px solid rgba(85,168,255,.45); background: rgba(4,14,27,.55); }
+.part-diagnosis h4 { margin: 0 0 12px; color: var(--cyan); font-family: Georgia, serif; font-size: 20px; font-weight: 500; }
+.part-diagnosis p { margin: 8px 0 0; font-size: 14px; }
+.part-diagnosis b { color: #e9f3ff; }
 .review-intro { margin: -6px 0 18px; color: var(--muted); font-size: 13px; }
 .answer-review { display: grid; gap: 12px; }
 .review-item { padding: 16px; border-left: 2px solid rgba(97,232,210,.55); background: rgba(4,14,27,.55); }
@@ -155,9 +162,11 @@ h1 { margin: 0; font-family: Georgia, "Times New Roman", serif; font-size: clamp
   .report-grid { grid-template-columns: 1fr; }
   .report-grid article.wide { grid-column: auto; }
   .metrics { grid-template-columns: 1fr; }
+  .part-feedback { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
 }
+
 

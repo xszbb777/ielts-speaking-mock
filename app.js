@@ -40,7 +40,7 @@
     interimTranscript: $("interimTranscript"), manualAnswer: $("manualAnswer"), micButton: $("micButton"),
     submitAnswer: $("submitAnswer"), repeatButton: $("repeatButton"), questionCounter: $("questionCounter"),
     overallBand: $("overallBand"), scoreGrid: $("scoreGrid"), metrics: $("metrics"),
-    memorisedNotes: $("memorisedNotes"), expansionNotes: $("expansionNotes"), answerReview: $("answerReview"), restartButton: $("restartButton"),
+    memorisedNotes: $("memorisedNotes"), expansionNotes: $("expansionNotes"), partFeedback: $("partFeedback"), answerReview: $("answerReview"), restartButton: $("restartButton"),
     downloadButton: $("downloadButton"),
   };
 
@@ -356,10 +356,26 @@
     return profile.opinion;
   }
 
+  function ensurePart3ModelAnswer(answer, topic) {
+    const sentences = clean(answer).match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(clean).filter(Boolean) || [];
+    const profile = profileForPart3(topic);
+    if (sentences.length < 2) {
+      sentences.push("In practice, the best approach is to balance the benefits with clear limits and personal responsibility.");
+    }
+    if (!sentences.some(sentence => /\b(for example|for instance|such as)\b/i.test(sentence))) {
+      const example = clean(profile.examples);
+      sentences.push(`For example, ${example.charAt(0).toLowerCase()}${example.slice(1)}`);
+    }
+    if (sentences.length < 3) {
+      sentences.push("This kind of concrete case shows how the wider idea can affect everyday decisions.");
+    }
+    return sentences.slice(0, 5).join(" ");
+  }
+
   function referenceAnswerFor(item) {
     if (item.part === 3) {
-      if (item.modelAnswer) return { source: "IELTS Part 3 自适应追问示范回答", text: item.modelAnswer };
-      return { source: "IELTS Part 3 高分示范回答", text: generatedPart3Answer(item.question, item.topic) };
+      if (item.modelAnswer) return { source: "IELTS Part 3 自适应追问示范回答（3–5句，含例子）", text: ensurePart3ModelAnswer(item.modelAnswer, item.topic) };
+      return { source: "IELTS Part 3 高分示范回答（3–5句，含例子）", text: ensurePart3ModelAnswer(generatedPart3Answer(item.question, item.topic), item.topic) };
     }
     const exact = standardAnswers.get(questionKey(item.question));
     if (exact) return { source: "题库原题参考答案", text: exact };
@@ -399,6 +415,24 @@
     speechSynthesis.speak(utterance);
   }
 
+  function examinerPromptFor(item) {
+    if (state.phase === "part1") {
+      const previous = state.queue[state.index - 1];
+      if (!previous) return `Let's talk about ${item.topic}. ${item.question}`;
+      if (previous.topic !== item.topic) return `Thank you. Now let's talk about ${item.topic}. ${item.question}`;
+      return item.question;
+    }
+    if (state.phase === "part3" && state.index > 0 && !item.adaptive) {
+      const bridges = [
+        "Thank you. Let's look at this from another angle.",
+        "All right. Now I'd like you to consider a broader question.",
+        "Let's develop that discussion a little further.",
+      ];
+      return `${bridges[(state.index - 1) % bridges.length]} ${item.question}`;
+    }
+    return item.question;
+  }
+
   function makePart1Queue() {
     const topicMap = new Map();
     bank.part1.forEach(item => {
@@ -407,19 +441,27 @@
     });
     const allTopics = [...topicMap.keys()];
     const featuredTopics = allTopics.filter(topic => FEATURED_PART1_TOPICS.has(topic));
-    const candidateTopics = featuredTopics.length && Math.random() < .85 ? featuredTopics : allTopics;
-    const topics = selectWithHistory(candidateTopics, Math.random() < .35 ? 2 : 3, "part1Topics", topic => topic,
-      topic => frequencyWeight({ ...(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }), stars: PART1_STAR_PRIORITY[topic] || 0 }));
+    const nonFeaturedTopics = allTopics.filter(topic => !FEATURED_PART1_TOPICS.has(topic));
     const target = Math.floor(Math.random() * 5) + 8;
+    const topicCount = target >= 10 ? 3 : (Math.random() < .35 ? 2 : 3);
+    const topics = selectWithHistory(featuredTopics.length ? featuredTopics : allTopics, topicCount, "part1Topics", topic => topic,
+      topic => frequencyWeight({ ...(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }), stars: PART1_STAR_PRIORITY[topic] || 0 }));
     const topicPools = new Map(topics.map(topic => [topic, sample(topicMap.get(topic), topicMap.get(topic).length)]));
     const selected = [];
     let round = 0;
-    while (selected.length < target && round < 8) {
+    while (selected.length < target - 1 && round < 8) {
       topics.forEach(topic => {
         const candidates = topicPools.get(topic);
-        if (selected.length < target && candidates[round]) selected.push({ part: 1, topic, question: candidates[round] });
+        if (selected.length < target - 1 && candidates[round]) selected.push({ part: 1, topic, question: candidates[round] });
       });
       round += 1;
+    }
+    if (nonFeaturedTopics.length) {
+      const outsideTopic = selectWithHistory(nonFeaturedTopics, 1, "part1Topics", topic => topic,
+        topic => frequencyWeight({ ...(PART1_FREQUENCY[topic] || { count: 55, status: "retained" }), stars: 0 }))[0];
+      const outsideQuestion = sample(topicMap.get(outsideTopic), 1)[0];
+      const insertionPoint = Math.min(selected.length, Math.max(2, Math.floor(selected.length * (.35 + Math.random() * .3))));
+      selected.splice(insertionPoint, 0, { part: 1, topic: outsideTopic, question: outsideQuestion, nonFeatured: true });
     }
     return selected;
   }
@@ -468,7 +510,7 @@
     els.progressFill.style.width = `${((state.index + 1) / state.queue.length) * 100}%`;
     els.partLabel.textContent = state.phase === "part1" ? "PART 1 · INTERVIEW" : "PART 3 · DISCUSSION";
     els.phaseTitle.textContent = state.phase === "part1" ? item.topic : (state.part3Group?.topic || "Discussion");
-    setTimeout(() => speak(item.question), 280);
+    setTimeout(() => speak(examinerPromptFor(item)), 280);
   }
 
   function setupRecognition() {
@@ -609,7 +651,7 @@
     els.questionCounter.textContent = "1 minute to prepare";
     els.progressFill.style.width = "50%";
     startTimer("down", 60);
-    speak(`Now I am going to give you a topic. You have one minute to prepare. ${state.part2Card.title}`);
+    speak(`Thank you. That is the end of Part One. We will now move to Part Two. I am going to give you a topic, and you will have one minute to prepare. ${state.part2Card.title}`);
   }
 
   function beginPart2Speech() {
@@ -688,7 +730,7 @@
     els.prepPanel.classList.add("hidden");
     els.answerPanel.classList.remove("hidden");
     els.cueList.classList.add("hidden");
-    speak("We have been talking about this topic, and I would now like to discuss it in a more general way.", () => renderQuestion());
+    speak("Thank you. That is the end of Part Two. We will now move to Part Three. We have been talking about this topic, and I would now like to discuss it in a more general way.", () => renderQuestion());
   }
 
   function maybeAddAdaptiveFollowUp(answer) {
@@ -744,7 +786,7 @@
   }
 
   function band(value) {
-    return Math.max(4, Math.min(7.5, Math.round(value * 2) / 2));
+    return Math.max(0, Math.min(9, Math.round(value * 2) / 2));
   }
 
   function analyse() {
@@ -784,24 +826,70 @@
     const scores = {
       "Fluency & Coherence": band(fluency),
       "Lexical Resource": band(lexical),
-      "Grammar": band(grammar),
+      "Grammatical Range & Accuracy": band(grammar),
       "Pronunciation": band(pronunciation),
     };
     const overall = band(Object.values(scores).reduce((a, b) => a + b, 0) / 4);
-    return { scores, overall, wpm, fillers, uniqueRatio, repetitions, valid, p2 };
+    const evidence = {
+      "Fluency & Coherence": `${wpm} wpm；${completeAnswers.length}/${valid.length || 0} 个回答达到建议展开长度；检测到 ${repetitions} 处连续重复。`,
+      "Lexical Resource": `不同词占比约 ${Math.round(uniqueRatio * 100)}%；较长词占比约 ${Math.round(longRatio * 100)}%。`,
+      "Grammatical Range & Accuracy": `检测到 ${connectors} 个常见衔接表达；平均句长约 ${avgSentence.toFixed(1)} 词。`,
+      "Pronunciation": "文字转写无法观察重音、语调、音素准确度及持续可懂度，因此采用中性练习分。",
+    };
+    return { scores, evidence, overall, wpm, fillers, uniqueRatio, repetitions, valid, p2 };
+  }
+
+  function partFeedbackFor(report) {
+    const answered = part => report.valid.filter(answer => answer.part === part);
+    const allForPart = part => state.answers.filter(answer => answer.part === part);
+    const p1 = answered(1);
+    const p2 = answered(2)[0];
+    const p3 = answered(3);
+    const cards = [];
+
+    if (!p1.length) {
+      cards.push({ part: "Part 1", issue: "没有捕捉到可分析的回答。", reason: "缺少语言样本，无法判断回答是否直接、自然并带有恰当细节。" });
+    } else {
+      const short = p1.filter(answer => words(answer.text).length < 8).length;
+      const long = p1.filter(answer => words(answer.text).length > 65).length;
+      const issue = short ? `${short}/${allForPart(1).length} 个回答展开不足。` : long ? `${long} 个回答偏长，可能削弱问答节奏。` : "回答长度整体合适，但部分观点仍可增加一个具体个人细节。";
+      const reason = short ? "短答通常不能充分展示词汇变化和句式范围；只需补一句原因或个人例子。" : long ? "Part 1 重在自然、直接的短答，长篇铺陈容易显得背稿或失去重点。" : "长度达标不等于充分发展；具体细节能让回答更自然，也能支持连贯性判断。";
+      cards.push({ part: "Part 1", issue, reason });
+    }
+
+    if (!p2) {
+      cards.push({ part: "Part 2", issue: "没有捕捉到可分析的长回答。", reason: "缺少连续讲话样本，无法判断叙述组织、两分钟展开和衔接能力。" });
+    } else {
+      const count = words(p2.text).length;
+      const hasExample = /\b(for example|for instance|such as|when i|one time)\b/i.test(p2.text);
+      const issue = count < 100 ? `长回答约 ${count} 词，内容支撑不足。` : !hasExample ? "有一定长度，但具体场景或例子不够明显。" : "整体展开较完整，仍可加强开头—细节—结果的结构标记。";
+      const reason = count < 100 ? "内容过短通常难以持续接近两分钟，也限制了事件细节、感受和变化的呈现。" : !hasExample ? "抽象描述较难维持连贯长讲；具体时间、地点、人物和结果能形成更清晰的叙述线。" : "更清楚的叙述顺序能减少跳跃，让考官更容易跟随内容发展。";
+      cards.push({ part: "Part 2", issue, reason });
+    }
+
+    if (!p3.length) {
+      cards.push({ part: "Part 3", issue: "没有捕捉到可分析的讨论回答。", reason: "缺少观点、论证和例子，无法判断抽象话题的展开能力。" });
+    } else {
+      const short = p3.filter(answer => words(answer.text).length < 28).length;
+      const supported = p3.filter(answer => /\b(because|since|therefore|as a result|for example|for instance|such as)\b/i.test(answer.text)).length;
+      const issue = short ? `${short}/${allForPart(3).length} 个回答较短，论证层次不足。` : supported < Math.ceil(p3.length / 2) ? "多数观点缺少清楚的原因或现实例子。" : "大多数回答已有支撑，但比较、影响或长期结果仍可更深入。";
+      const reason = short ? "Part 3 需要从直接观点发展到原因和例子；短答会限制连贯性、词汇与复杂句式的展示。" : supported < Math.ceil(p3.length / 2) ? "只有观点而没有支撑，答案容易显得概括；加入真实情境能说明观点为何成立。" : "加入对比和后果能显示对抽象问题的分析，而不只是列举理由。";
+      cards.push({ part: "Part 3", issue, reason });
+    }
+    return cards;
   }
 
   function renderResults() {
     const report = analyse();
     els.overallBand.textContent = report.overall.toFixed(1);
     const descriptions = {
-      "Fluency & Coherence": "节奏、停顿与观点衔接",
-      "Lexical Resource": "词汇范围与表达准确度",
-      "Grammar": "句式变化与语法控制",
-      "Pronunciation": "无法由转写可靠评分，保持中性",
+      "Fluency & Coherence": "流利性与连贯性",
+      "Lexical Resource": "词汇多样性",
+      "Grammatical Range & Accuracy": "语法多样性及准确性",
+      "Pronunciation": "发音",
     };
     els.scoreGrid.innerHTML = Object.entries(report.scores).map(([name, score]) => `
-      <div class="score-card"><p>${name}<br><small>${descriptions[name]}</small></p><b>${score.toFixed(1)}</b></div>
+      <div class="score-card"><p>${name}<br><small>${descriptions[name]}</small></p><b>${score.toFixed(1)}</b><p class="score-evidence">${escapeHtml(report.evidence[name])}</p></div>
     `).join("");
     els.metrics.innerHTML = [
       [report.wpm, "words / minute"],
@@ -829,6 +917,13 @@
     if (report.p2 && words(report.p2.text).length < 100) expansions.push("Part 2 还可以增加一个具体场景、一个感官细节，以及事情前后的变化，让讲话更接近两分钟。");
     if (!expansions.length) expansions.push("你的答案长度分配较均衡。下一步可在 Part 3 的例子后补一句影响或对比，提升观点的层次感。");
     els.expansionNotes.innerHTML = `<ul>${expansions.map(x => `<li>${x}</li>`).join("")}</ul>`;
+    els.partFeedback.innerHTML = partFeedbackFor(report).map(item => `
+      <section class="part-diagnosis">
+        <h4>${item.part}</h4>
+        <p><b>不足：</b>${item.issue}</p>
+        <p><b>原因：</b>${item.reason}</p>
+      </section>
+    `).join("");
     els.answerReview.innerHTML = state.answers.map((answer, index) => {
       const reference = referenceAnswerFor(answer);
       return `
@@ -866,7 +961,7 @@
   setupRecognition();
   els.audioOnlyToggle.checked = state.audioOnly;
   els.compatibilityNote.textContent = state.voiceSupported
-    ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。85% 概率优先从你标星图内的 Part 1 / Part 2 题目抽取。`
+    ? `语音识别已就绪 · 题库包含 ${bank.stats.part1Questions} 道 Part 1、${bank.stats.part2Cards} 张题卡和 ${bank.stats.part3Questions} 道 Part 3 问题。Part 1 每场固定穿插 1 道题库内非标星题；Part 2 继续优先抽取标星题。`
     : "此浏览器不支持实时语音识别；仍可使用文字作答完成完整流程。建议使用最新版 Chrome 或 Edge。";
 
   els.startButton.addEventListener("click", beginExam);
@@ -892,4 +987,5 @@
   els.restartButton.addEventListener("click", beginExam);
   els.downloadButton.addEventListener("click", downloadTranscript);
 })();
+
 
